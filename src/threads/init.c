@@ -134,6 +134,7 @@ pintos_init (void)
     run_actions (argv);
   } else {
     // TODO: no command line passed to kernel. Run interactively 
+    printf("CS2042> My custom shell is alive!\n");
   }
 
   /* Finish up. */
