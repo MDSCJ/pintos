@@ -22,6 +22,7 @@
 #include "threads/palloc.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/exception.h"
@@ -71,7 +72,87 @@ static void locate_block_device (enum block_type, const char *name);
 #endif
 
 int pintos_init (void) NO_RETURN;
+void snake(void) {
+    int width = 20;
+    int height = 10;
+    int grid[10][20] = {0}; // Initialize the 10x20 grid with 0s
 
+    int head_x = width / 2;
+    int head_y = height / 2;
+    int length = 3;
+    int dx = 1, dy = 0; // Start moving to the right
+
+    // Create "random" starting food using the OS clock
+    uint32_t seed = (uint32_t) rtc_get_time();
+    int food_x = seed % width;
+    int food_y = (seed / 2) % height;
+    grid[food_y][food_x] = -1; // -1 represents the food
+
+    while (1) {
+        // 1. NON-BLOCKING INPUT
+        // Only grab a key if the keyboard buffer has one waiting
+        if (!input_empty()) {
+            uint8_t c = input_getc();
+            if (c == 'w' && dy == 0) { dx = 0; dy = -1; }
+            else if (c == 's' && dy == 0) { dx = 0; dy = 1; }
+            else if (c == 'a' && dx == 0) { dx = -1; dy = 0; }
+            else if (c == 'd' && dx == 0) { dx = 1; dy = 0; }
+            else if (c == 'q') { break; } // Press 'q' to quit
+        }
+
+        // 2. MOVE THE HEAD
+        head_x += dx;
+        head_y += dy;
+
+        // 3. COLLISION (Walls)
+        if (head_x < 0 || head_x >= width || head_y < 0 || head_y >= height) {
+            printf("\nGAME OVER! You hit a wall.\n");
+            break;
+        }
+
+        // 4. COLLISION (Body & Food)
+        if (grid[head_y][head_x] > 0) {
+            printf("\nGAME OVER! You ate your own tail.\n");
+            break;
+        }
+        else if (grid[head_y][head_x] == -1) {
+            length++; // Grow the snake
+            
+            // Math trick to spawn new random food without a true rand() function
+            seed = (seed * 1103515245 + 12345);
+            food_x = (seed / 65536) % width;
+            food_y = (seed / 65536) % height;
+            grid[food_y][food_x] = -1;
+        }
+
+        // Drop the new head timer onto the grid
+        grid[head_y][head_x] = length;
+
+        // 5. RENDER AND DECAY
+        // Print empty lines to visually "clear" the screen
+        for (int i = 0; i < 25; i++) printf("\n");
+
+        printf("PINTOS SNAKE | Score: %d | (WASD to move, Q to quit)\n", length - 3);
+        
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (grid[y][x] == -1) {
+                    printf("*"); // Draw Food
+                } else if (grid[y][x] > 0) {
+                    printf("O"); // Draw Body
+                    grid[y][x]--; // TIMER DECAY: Subtract 1 from the tail!
+                } else {
+                    printf("."); // Draw Empty Space
+                }
+            }
+            printf("\n"); // Next row
+        }
+
+        // 6. GAME SPEED
+        // Pauses the OS for a fraction of a second so it's playable
+        timer_sleep(TIMER_FREQ / 5); 
+    }
+} 
 /* Pintos main entry point. */
 int
 pintos_init (void)
@@ -134,13 +215,104 @@ pintos_init (void)
     run_actions (argv);
   } else {
     // TODO: no command line passed to kernel. Run interactively 
-    printf("CS2042> My custom shell is alive!\n");
+    printf("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
+    static char new_name[128]; // Declared static so it isn't destroyed after the loop
+    new_name[0] = '\0';        // Initialize as empty
+
+    while (1) {
+      printf("CS2042> ");
+      char buffer[128];
+      int pos = 0;
+      const char *name = "OS";
+
+      // Apply the new username if it was changed
+      if (new_name[0] != '\0') {
+          name = new_name;
+      }
+
+      /* --- SINGLE, CORRECT INPUT LOOP --- */
+      while (pos < 127) {
+        uint8_t c = input_getc();
+
+        // 1. Handle Enter
+        if (c == '\r' || c == '\n') {
+          printf("\n");
+          break;
+        }
+        // 2. Handle Backspace (ASCII 8 or 127)
+        else if (c == '\b' || c == 127) {
+          if (pos > 0) {
+            pos--;             
+            printf("\b \b");   
+          }
+        }
+        // 3. Handle normal characters
+        else {
+          printf("%c", c);#include "devices/rtc.h"
+          buffer[pos++] = c;
+        }
+      }
+      buffer[pos] = '\0';   /* now safely null-terminated */
+
+      /* --- COMMAND EXECUTION --- */
+      if (!strcmp(buffer, "whoami")) {
+        printf("-%s\n", name);
+      }
+      else if (!strcmp(buffer, "time")) {
+        printf("%"PRIu32"\n", (uint32_t) rtc_get_time());
+      }
+      else if (!streamcmp(buffer, "snake")){
+        snake();
+      }
+      else if (!strcmp(buffer, "settings")) {
+        printf("1. Change username\n");
+        printf("2. Exit\n");
+        
+        // Wait for the user to select an option (1 or 2)
+        uint8_t option = input_getc();
+        printf("%c\n", option); // echo what they typed
+        
+        if (option == '1') {
+          printf("Enter new username: ");
+          int new_pos = 0;
+          
+          while (new_pos < 127) {
+            uint8_t c = input_getc();
+            if (c == '\r' || c == '\n') {
+              printf("\n");
+              break;
+            } else if (c == '\b' || c == 127) {
+              if (new_pos > 0) {
+                new_pos--;
+                printf("\b \b");
+              }
+            } else {
+              printf("%c", c);
+              new_name[new_pos++] = c;
+            }
+          }
+          new_name[new_pos] = '\0';
+          printf("Username changed to %s\n", new_name);
+        }
+      }
+      else if (!strcmp(buffer, "exit")) {
+        /* Removed \n from the first three prints so they overwrite each other */
+        printf ("\rExiting Pintos   ");
+        timer_sleep (TIMER_FREQ);
+        printf ("\rExiting Pintos.  ");
+        timer_sleep (TIMER_FREQ);
+        printf ("\rExiting Pintos.. ");
+        timer_sleep (TIMER_FREQ);
+        printf ("\rExiting Pintos...\n");
+        shutdown_configure (SHUTDOWN_POWER_OFF);
+      }
+    }
   }
 
   /* Finish up. */
   shutdown ();
   thread_exit ();
-}
+} 
 
 /* Clear the "BSS", a segment that should be initialized to
    zeros.  It isn't actually stored on disk or zeroed by the

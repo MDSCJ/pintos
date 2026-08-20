@@ -27,6 +27,12 @@ input_putc (uint8_t key)
 
 /* Retrieves a key from the input buffer.
    If the buffer is empty, waits for a key to be pressed. */
+bool
+input_empty (void) 
+{
+  return intq_empty (&buffer);
+}
+
 uint8_t
 input_getc (void) 
 {
