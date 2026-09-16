@@ -2,6 +2,7 @@
 #include <debug.h>
 #include "devices/intq.h"
 #include "devices/serial.h"
+#include "threads/interrupt.h"
 
 /* Stores keys from the keyboard and serial port. */
 static struct intq buffer;
@@ -30,7 +31,14 @@ input_putc (uint8_t key)
 bool
 input_empty (void) 
 {
-  return intq_empty (&buffer);
+  enum intr_level old_level;
+  bool empty;
+
+  old_level = intr_disable ();
+  empty = intq_empty (&buffer);
+  intr_set_level (old_level);
+
+  return empty;
 }
 
 uint8_t

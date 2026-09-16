@@ -72,7 +72,7 @@ static void locate_block_device (enum block_type, const char *name);
 #endif
 
 int pintos_init (void) NO_RETURN;
-void snake(void) {
+static void snake(void) {
     int width = 20;
     int height = 10;
     int grid[10][20] = {0}; // Initialize the 10x20 grid with 0s
@@ -89,8 +89,6 @@ void snake(void) {
     grid[food_y][food_x] = -1; // -1 represents the food
 
     while (1) {
-        // 1. NON-BLOCKING INPUT
-        // Only grab a key if the keyboard buffer has one waiting
         if (!input_empty()) {
             uint8_t c = input_getc();
             if (c == 'w' && dy == 0) { dx = 0; dy = -1; }
@@ -153,6 +151,31 @@ void snake(void) {
         timer_sleep(TIMER_FREQ / 5); 
     }
 } 
+
+static void
+time_view (void)
+{
+  printf ("Press any key to return to the prompt.\n");
+
+  while (1)
+    {
+      time_t now = rtc_get_time ();
+      int64_t ticks = timer_ticks ();
+
+      printf ("\r%"PRIu32".%01"PRId64"   ", (uint32_t) now,
+              (ticks % TIMER_FREQ) * 10 / TIMER_FREQ);
+
+      if (!input_empty ())
+        {
+          (void) input_getc ();
+          printf ("\n");
+          return;
+        }
+
+      timer_sleep (TIMER_FREQ / 10);
+    }
+}
+
 /* Pintos main entry point. */
 int
 pintos_init (void)
@@ -218,8 +241,9 @@ pintos_init (void)
     printf("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
     static char new_name[128]; // Declared static so it isn't destroyed after the loop
     new_name[0] = '\0';        // Initialize as empty
+      bool should_exit = false;
 
-    while (1) {
+      while (!should_exit) {
       printf("CS2042> ");
       char buffer[128];
       int pos = 0;
@@ -248,7 +272,7 @@ pintos_init (void)
         }
         // 3. Handle normal characters
         else {
-          printf("%c", c);#include "devices/rtc.h"
+          printf("%c", c);
           buffer[pos++] = c;
         }
       }
@@ -259,9 +283,9 @@ pintos_init (void)
         printf("-%s\n", name);
       }
       else if (!strcmp(buffer, "time")) {
-        printf("%"PRIu32"\n", (uint32_t) rtc_get_time());
+        time_view ();
       }
-      else if (!streamcmp(buffer, "snake")){
+      else if (!strcmp(buffer, "snake")) {
         snake();
       }
       else if (!strcmp(buffer, "settings")) {
@@ -296,15 +320,9 @@ pintos_init (void)
         }
       }
       else if (!strcmp(buffer, "exit")) {
-        /* Removed \n from the first three prints so they overwrite each other */
-        printf ("\rExiting Pintos   ");
-        timer_sleep (TIMER_FREQ);
-        printf ("\rExiting Pintos.  ");
-        timer_sleep (TIMER_FREQ);
-        printf ("\rExiting Pintos.. ");
-        timer_sleep (TIMER_FREQ);
-        printf ("\rExiting Pintos...\n");
+        printf ("Exiting Pintos...\n");
         shutdown_configure (SHUTDOWN_POWER_OFF);
+          should_exit = true;
       }
     }
   }
@@ -519,9 +537,6 @@ run_actions (char **argv)
     }
   
 }
-
-/* Prints a kernel command line help message and powers off the
-   machine. */
 static void
 usage (void)
 {
@@ -563,7 +578,7 @@ usage (void)
   shutdown_power_off ();
 }
 
-#ifdef FILESYS
+        #ifdef FILESYS
 /* Figure out what block devices to cast in the various Pintos roles. */
 static void
 locate_block_devices (void)
