@@ -37,6 +37,11 @@ Switch back to your Docker terminal to compile and run your code.
 cd /home/PKUOS/pintos/src/threads
 make
 ```
+**To Build:**
+```bash
+cd build
+pintos --
+```
 
 **To Run a Test:**
 ```bash
