@@ -247,7 +247,7 @@ pintos_init (void)
       printf("CS2042> ");
       char buffer[128];
       int pos = 0;
-      const char *name = "OS";
+      const char *name = "Jayasinghe M.D.S.J  240278X";
 
       // Apply the new username if it was changed
       if (new_name[0] != '\0') {
@@ -284,6 +284,16 @@ pintos_init (void)
       }
       else if (!strcmp(buffer, "time")) {
         time_view ();
+      }
+      else if (!strcmp(buffer, "ram")) {
+        printf ("RAM available to OS: %"PRIu32" kB\n",// PRIu32 stands for Print unsigned integer
+                init_ram_pages * PGSIZE / 1024);
+      }
+      else if (!strcmp(buffer, "thread")) {
+        thread_print_stats ();
+      }
+      else if (!strcmp(buffer, "priority")) {
+        printf ("Current thread priority: %d\n", thread_get_priority ());
       }
       else if (!strcmp(buffer, "snake")) {
         snake();
