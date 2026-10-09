@@ -3,6 +3,7 @@
 
 #include <debug.h>
 #include <list.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 /* States in a thread's life cycle. */
@@ -101,6 +102,14 @@ struct thread
     struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
+   struct list children;               /* Child process records. */
+   struct process_child *child_record; /* This process's parent record. */
+   int exit_status;                    /* Status reported on exit. */
+   bool user_loaded;                   /* Executable loaded successfully. */
+   struct file *executable;            /* Running executable. */
+   struct list fds;                    /* Open file descriptors. */
+   int next_fd;                        /* Next descriptor to allocate. */
+
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif

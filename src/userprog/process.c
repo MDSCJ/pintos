@@ -20,6 +20,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static void child_release (struct process_child *child);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -29,6 +30,9 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  struct process_child *child;
+  char process_name[16];
+  char *save_ptr;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -38,10 +42,43 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  strlcpy (process_name, file_name, sizeof process_name);
+  strtok_r (process_name, " ", &save_ptr);
+  child = malloc (sizeof *child);
+  if (child == NULL)
+    {
+      palloc_free_page (fn_copy);
+      return TID_ERROR;
+    }
+  sema_init (&child->load_sema, 0);
+  sema_init (&child->exit_sema, 0);
+  child->load_success = false;
+  child->exited = false;
+  child->waited = false;
+  child->exit_status = -1;
+  child->refs = 2;
+  child->cmdline = fn_copy;
+  list_push_back (&thread_current ()->children, &child->elem);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (process_name, PRI_DEFAULT, start_process, child);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    {
+      list_remove (&child->elem);
+      child_release (child);
+      child_release (child);
+    }
+  else
+    {
+      child->tid = tid;
+      sema_down (&child->load_sema);
+      if (!child->load_success)
+        {
+          list_remove (&child->elem);
+          child_release (child);
+          tid = TID_ERROR;
+        }
+    }
   return tid;
 }
 
@@ -50,9 +87,12 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-  char *file_name = file_name_;
+  struct process_child *child = file_name_;
+  char *file_name = child->cmdline;
   struct intr_frame if_;
   bool success;
+
+  thread_current ()->child_record = child;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -61,10 +101,13 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+  child->load_success = success;
+  sema_up (&child->load_sema);
+  if (!success)
+    {
+      thread_current ()->exit_status = -1;
+      thread_exit ();
+    }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -86,9 +129,33 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
+  struct list_elem *e;
+  struct process_child *child = NULL;
+  int status;
+
+  for (e = list_begin (&thread_current ()->children);
+       e != list_end (&thread_current ()->children); e = list_next (e))
+    {
+      struct process_child *candidate = list_entry (e, struct process_child,
+                                                     elem);
+      if (candidate->tid == child_tid)
+        {
+          child = candidate;
+          break;
+        }
+    }
+  if (child == NULL || child->waited)
+    return -1;
+
+  child->waited = true;
+  if (!child->exited)
+    sema_down (&child->exit_sema);
+  status = child->exit_status;
+  list_remove (&child->elem);
+  child_release (child);
+  return status;
 }
 
 /* Free the current process's resources. */
@@ -97,6 +164,41 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  if (cur->user_loaded)
+    printf ("%s: exit(%d)\n", cur->name, cur->exit_status);
+
+  while (!list_empty (&cur->fds))
+    {
+      struct file_descriptor *fd =
+        list_entry (list_pop_front (&cur->fds), struct file_descriptor, elem);
+      file_close (fd->file);
+      free (fd);
+    }
+  if (cur->executable != NULL)
+    {
+      file_allow_write (cur->executable);
+      file_close (cur->executable);
+      cur->executable = NULL;
+    }
+
+  while (!list_empty (&cur->children))
+    {
+      struct process_child *child =
+        list_entry (list_pop_front (&cur->children),
+                    struct process_child, elem);
+      child_release (child);
+    }
+
+  if (cur->child_record != NULL)
+    {
+      struct process_child *child = cur->child_record;
+      child->exit_status = cur->exit_status;
+      child->exited = true;
+      sema_up (&child->exit_sema);
+      child_release (child);
+      cur->child_record = NULL;
+    }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -113,6 +215,17 @@ process_exit (void)
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
+    }
+}
+
+static void
+child_release (struct process_child *child)
+{
+  child->refs--;
+  if (child->refs == 0)
+    {
+      palloc_free_page (child->cmdline);
+      free (child);
     }
 }
 

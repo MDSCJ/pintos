@@ -530,6 +530,15 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->locks_held);
   t->waiting_lock = NULL;
   t->waiting_semaphore = NULL;
+#ifdef USERPROG
+  list_init (&t->children);
+  t->child_record = NULL;
+  t->exit_status = -1;
+  t->user_loaded = false;
+  t->executable = NULL;
+  list_init (&t->fds);
+  t->next_fd = 2;
+#endif
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
