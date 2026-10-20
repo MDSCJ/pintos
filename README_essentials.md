@@ -72,3 +72,31 @@ Always save checkpoints of your work when you get a test to pass!
 When you are done working for the day, simply type `exit` in the Docker terminal or press `Ctrl + D`. 
 
 Because we use the `--rm` flag, the container will instantly delete itself to keep your computer clean. All your code remains safely saved on your host machine.
+
+# How to Run Pintos (Project 2: userprog)
+
+This guide covers how to build the Pintos kernel, set up the virtual file system, and execute user programs.
+
+## 1. Build the OS
+Before running anything, compile the kernel and navigate to the build directory:
+
+```bash
+cd ~/pintos/src/userprog
+make clean
+make
+cd build
+
+# Create a 2MB virtual disk for the file system
+pintos-mkdisk filesys.dsk --filesys-size=2
+
+# Format the disk 
+# Note: For our specific build, this formats the drive and then drops you into the interactive CS2042> shell.
+pintos -- -f -q
+
+or
+
+# 1. Copy the executable into the Pintos file system
+pintos -p tests/userprog/args-none -a args-none -- -q
+
+# 2. Boot Pintos and execute the program
+pintos -- -q run args-none
