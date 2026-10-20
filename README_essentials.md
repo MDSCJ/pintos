@@ -19,6 +19,13 @@ docker run -it --rm --name pintos-env --mount type=bind,source=$PWD,target=/home
 ```
 *(Note: If you are not in the pintos folder when running this, replace `$PWD` with `$HOME/pintos`)*
 
+If you get to the prblem of getting already docker running problem, run this,
+
+```bash 
+docker rm -f pintos-env
+```
+
+
 ### 2. Configure the Path (Inside Docker)
 Once the container starts, you will see a root prompt (`root@<container-id>:/#`). You must run this command every time you open the container to enable the `pintos` run commands:
 ```bash
