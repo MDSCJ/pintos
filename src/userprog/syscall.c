@@ -166,7 +166,7 @@ sys_exit (int status)
 {
   struct thread *cur = thread_current ();
   #ifdef USERPROG
-    cur->exit_status = -1;
+    cur->exit_status = status;  
   #endif
   thread_exit ();
 }

@@ -19,6 +19,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -426,13 +427,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
-  /* Parse arguments from file_name (which is the full command line). */
-  char cmd_copy[PGSIZE];
+/* Parse arguments from file_name (which is the full command line). */
+  char *cmd_copy = malloc (strlen (file_name) + 1);
+  if (cmd_copy == NULL)
+    goto done;
+
   char *argv[128];
   int argc = 0;
   char *token, *save_ptr;
 
-  strlcpy (cmd_copy, file_name, sizeof cmd_copy);
+  strlcpy (cmd_copy, file_name, strlen (file_name) + 1);
   for (token = strtok_r (cmd_copy, " ", &save_ptr); token != NULL;
        token = strtok_r (NULL, " ", &save_ptr))
     {
@@ -575,9 +579,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
           release_filesys_lock ();
         }
     }
+    if (cmd_copy != NULL)     
+      free (cmd_copy);
   return success;
 }
-
+
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
