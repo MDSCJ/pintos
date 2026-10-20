@@ -13,7 +13,9 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "threads/malloc.h"
 #include "userprog/process.h"
+typedef int pid_t;
 
 struct lock filesys_lock;
 
@@ -48,7 +50,9 @@ static void
 syscall_exit_fail (void)
 {
   struct thread *cur = thread_current ();
-  cur->exit_status = -1;
+  #ifdef USERPROG
+    cur->exit_status = -1;
+  #endif  
   thread_exit ();
 }
 
@@ -161,7 +165,9 @@ static void
 sys_exit (int status)
 {
   struct thread *cur = thread_current ();
-  cur->exit_status = status;
+  #ifdef USERPROG
+    cur->exit_status = -1;
+  #endif
   thread_exit ();
 }
 
